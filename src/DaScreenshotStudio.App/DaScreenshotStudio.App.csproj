@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>DaScreenshotStudio</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <IsAotCompatible>true</IsAotCompatible>
+    <UseOptimizedPublish>false</UseOptimizedPublish>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishAot)' == 'true' or '$(PublishSingleFile)' == 'true'">
+    <SelfContained>true</SelfContained>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true' and '$(PublishAot)' != 'true'">
+    <PublishTrimmed>true</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.5" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.5" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+    <PackageReference Include="Avalonia.Angle.Windows.Natives" Version="2.1.27548.20260419" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\data\Items.json" Link="Items.json" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DaScreenshotStudio.Engine\DaScreenshotStudio.Engine.csproj" />
+  </ItemGroup>
+
+  <Target Name="DropPublishedSymbols" AfterTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(CopyOutputSymbolsToPublishDirectory)' == 'false'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

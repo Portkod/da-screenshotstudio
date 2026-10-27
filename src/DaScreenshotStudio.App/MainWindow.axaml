@@ -1,0 +1,752 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DaScreenshotStudio.App.ViewModels"
+        xmlns:controls="using:DaScreenshotStudio.App.Controls"
+        x:Class="DaScreenshotStudio.App.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding WindowTitle}"
+        Width="1680" Height="1040"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}" />
+    <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+Z" Command="{Binding RedoCommand}" />
+    <KeyBinding Gesture="Ctrl+D" Command="{Binding DuplicateSelectedCommand}" />
+  </Window.KeyBindings>
+
+  <!-- The generic field editors, which the window and item sections build from the scene's own records. -->
+  <Window.DataTemplates>
+    <DataTemplate DataType="vm:TextFieldViewModel">
+      <Grid ColumnDefinitions="110,*" Margin="0,1">
+        <TextBlock Classes="label" Text="{Binding Label}" />
+        <TextBox Grid.Column="1" Text="{Binding Value}" />
+      </Grid>
+    </DataTemplate>
+    <DataTemplate DataType="vm:NumberFieldViewModel">
+      <Grid ColumnDefinitions="110,*" Margin="0,1">
+        <TextBlock Classes="label" Text="{Binding Label}" />
+        <NumericUpDown Grid.Column="1" Value="{Binding Value}" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                       PlaceholderText="none" />
+      </Grid>
+    </DataTemplate>
+    <DataTemplate DataType="vm:BoolFieldViewModel">
+      <CheckBox Content="{Binding Label}" IsChecked="{Binding Value}" Margin="110,1,0,1" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ChoiceFieldViewModel">
+      <Grid ColumnDefinitions="110,*" Margin="0,1">
+        <TextBlock Classes="label" Text="{Binding Label}" />
+        <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" HorizontalAlignment="Stretch" />
+      </Grid>
+    </DataTemplate>
+    <DataTemplate DataType="vm:GroupFieldViewModel">
+      <StackPanel Margin="0,4,0,0">
+        <TextBlock Classes="label" Text="{Binding Label}" FontWeight="SemiBold" />
+        <Border Classes="pane" Margin="0,2,0,0">
+          <ItemsControl ItemsSource="{Binding Fields}" />
+        </Border>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:ListFieldViewModel">
+      <StackPanel Margin="0,4,0,0" Spacing="2">
+        <TextBlock Classes="label" Text="{Binding Label}" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:RecordViewModel">
+              <Border Classes="pane" Margin="0,0,0,3">
+                <StackPanel>
+                  <ItemsControl ItemsSource="{Binding Fields}" />
+                  <Button Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Right" Margin="0,2,0,0" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="Add" Command="{Binding AddItemCommand}"
+                ToolTip.Tip="Adds a copy of the last record, or a blank one" />
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate DataType="vm:PathSettingViewModel">
+      <StackPanel Spacing="3" Margin="0,0,0,10">
+        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+          <TextBox Text="{Binding Value}" ToolTip.Tip="{Binding FullPath}"
+                   PlaceholderText="{Binding IsFolder, Converter={x:Static vm:Converters.PathPlaceholder}}" />
+          <Button Grid.Column="1" Content="Browse..." Click="OnBrowsePath" VerticalAlignment="Stretch"
+                  VerticalContentAlignment="Center" />
+        </Grid>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <TextBlock Classes="feedback" Classes.good="{Binding IsGood}" Classes.warning="{Binding IsWarning}"
+                     Classes.error="{Binding IsError}" Text="{Binding Glyph}" FontWeight="Bold" Width="12"
+                     TextAlignment="Center" VerticalAlignment="Top" />
+          <TextBlock Grid.Column="1" Classes="feedback" Classes.good="{Binding IsGood}"
+                     Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}"
+                     Text="{Binding Feedback}" TextWrapping="Wrap" />
+        </Grid>
+        <TextBlock Classes="muted" Text="{Binding Description}" />
+      </StackPanel>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <DockPanel>
+    <!-- Toolbar -->
+    <Border DockPanel.Dock="Top" Padding="6" BorderThickness="0,0,0,1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <WrapPanel Orientation="Horizontal">
+        <Button Content="New" Command="{Binding NewCommand}" Margin="0,0,4,0" />
+        <Button Content="Open..." Click="OnOpen" Margin="0,0,4,0" ToolTip.Tip="Open a scene (Ctrl+O)" />
+        <Button Content="Save" Click="OnSave" Margin="0,0,4,0" ToolTip.Tip="Save the scene (Ctrl+S)" />
+        <Button Content="Save as..." Click="OnSaveAs" Margin="0,0,12,0" />
+        <Button Content="Export BMP..." Click="OnExport" Margin="0,0,12,0"
+                ToolTip.Tip="Export as a screenshot (Ctrl+E)" />
+        <Button Content="Undo" Command="{Binding UndoCommand}" Margin="0,0,4,0" />
+        <Button Content="Redo" Command="{Binding RedoCommand}" Margin="0,0,16,0" />
+
+        <TextBlock Classes="label" Text="Reference" />
+        <Button Content="{Binding ReferenceName}" Click="OnLoadReference" Margin="0,0,4,0"
+                ToolTip.Tip="Load the screenshot to compare against. You can also drop a .bmp on the window." />
+        <Button Content="X" Command="{Binding ClearReferenceCommand}" Margin="0,0,8,0" ToolTip.Tip="Clear the reference" />
+        <TextBlock Classes="label" Text="Show" />
+        <ComboBox ItemsSource="{x:Static vm:MainViewModel.OverlayModes}" SelectedItem="{Binding Overlay}"
+                  Margin="0,0,8,0" MinWidth="120" ToolTip.Tip="Scene, the reference, a magenta difference mask, or a blend (F1-F4)" />
+        <Slider Minimum="0" Maximum="1" Value="{Binding BlendAmount}" Width="120" Margin="0,0,12,0"
+                IsVisible="{Binding Overlay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:OverlayMode.Blend}}" />
+        <Button Content="Reset view" Command="{Binding ResetViewCommand}" Margin="0,0,8,0" IsVisible="{Binding IsPanned}"
+                ToolTip.Tip="Back to the player (Home)." />
+        <TextBlock Classes="label" Text="Zoom" />
+        <ComboBox ItemsSource="{x:Static vm:MainViewModel.ZoomLevels}" SelectedItem="{Binding Zoom}" MinWidth="70" />
+      </WrapPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Padding="8,4" BorderThickness="0,1,0,0"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="1" Text="{Binding HoverText}" Margin="16,0" FontFamily="Consolas,monospace" />
+        <TextBlock Grid.Column="2" Text="{Binding DiffSummary}" FontWeight="SemiBold" />
+      </Grid>
+    </Border>
+
+    <!-- Left: tools -->
+    <TabControl DockPanel.Dock="Left" Width="340" Padding="0" x:Name="ToolTabs">
+      <TabItem Header="Objects">
+        <DockPanel Margin="6">
+          <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <Button Content="+ Aisling" Command="{Binding AddAislingCommand}" Margin="0,0,4,4" />
+            <Button Content="+ Creature" Command="{Binding AddCreatureCommand}" Margin="0,0,4,4" />
+            <Button Content="+ Item" Command="{Binding AddItemCommand}" Margin="0,0,4,4" />
+          </WrapPanel>
+          <WrapPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+            <Button Content="Duplicate" Command="{Binding DuplicateSelectedCommand}" Margin="0,0,4,4" />
+            <Button Content="Delete" Command="{Binding DeleteSelectedCommand}" Margin="0,0,4,4" />
+            <Button Content="Up" Command="{Binding MoveSelectedUpCommand}" Margin="0,0,4,4" />
+            <Button Content="Down" Command="{Binding MoveSelectedDownCommand}" Margin="0,0,4,4" />
+            <Button Content="Find loose items" Command="{Binding FindLooseItemsCommand}" Margin="0,0,4,4"
+                    ToolTip.Tip="Adds the ground items the reference shows on cells with none staged. Press again to stop." />
+            <TextBlock Classes="muted" Text="On the canvas: click to select, drag to move, arrows step a cell, R turns, Delete removes, Esc deselects, Ctrl+click opens or shuts a door, right-drag pans the view past the screenshot's edges, Home returns. The camera always centers on the player, so with nothing selected the arrows step the player." />
+          </WrapPanel>
+          <ListBox ItemsSource="{Binding Objects}" SelectedItem="{Binding Selected}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SceneObjectViewModel">
+                <TextBlock Text="{Binding Title}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Library">
+        <DockPanel Margin="6">
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+            <Button Content="Save selected aisling" Command="{Binding SaveToLibraryCommand}" />
+            <TextBlock Classes="muted" Margin="0,4,0,0"
+                       Text="Drag a character onto the map to place it. Hold Shift while dropping on an aisling to give it this look. Double-click places it on the camera cell." />
+          </StackPanel>
+          <ListBox x:Name="LibraryList" ItemsSource="{Binding LibraryEntries}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:LibraryEntryViewModel">
+                <Border Background="Transparent" PointerPressed="OnLibraryPointerPressed"
+                        DoubleTapped="OnLibraryDoubleTapped">
+                  <Grid ColumnDefinitions="64,*,Auto">
+                    <Image Source="{Binding Preview}" Height="72" Stretch="Uniform"
+                           RenderOptions.BitmapInterpolationMode="None" />
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" Margin="8,0" />
+                    <Button Grid.Column="2" Content="Remove" VerticalAlignment="Center"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).RemoveFromLibraryCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Items">
+        <DockPanel Margin="6">
+          <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,6">
+            <TextBox Text="{Binding ItemFilter}" PlaceholderText="Search name or file number" />
+            <ComboBox ItemsSource="{x:Static vm:MainViewModel.ItemCategories}" SelectedItem="{Binding ItemCategoryFilter}"
+                      HorizontalAlignment="Stretch" />
+            <CheckBox Content="Only items the selection can wear" IsChecked="{Binding FitGenderOnly}" />
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Classes="label" Text="Dye for dyeable items" />
+              <NumericUpDown Value="{Binding Dye}" Minimum="0" Maximum="255" />
+            </StackPanel>
+            <TextBlock Classes="muted" Text="Drag an item onto an aisling, or double-click to put it on the selected one." />
+          </StackPanel>
+          <ListBox ItemsSource="{Binding FilteredItems}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ItemEntryViewModel">
+                <Border Background="Transparent" PointerPressed="OnItemPointerPressed" DoubleTapped="OnItemDoubleTapped">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" />
+                    <TextBlock Classes="muted" Text="{Binding Detail}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Sprites" x:Name="SpritesTab">
+        <DockPanel Margin="6" DataContext="{Binding Sprites}" x:DataType="vm:SpriteBrowserViewModel">
+          <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,6">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="4">
+              <ComboBox ItemsSource="{x:Static vm:SpriteBrowserViewModel.Banks}" SelectedItem="{Binding Bank}"
+                        HorizontalAlignment="Stretch" />
+              <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:SceneObjectViewModel.Directions}"
+                        SelectedItem="{Binding Facing}" IsVisible="{Binding IsCreatures}" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="Which way the creature previews face, and new creatures placed from here" />
+            </Grid>
+            <TextBox Text="{Binding Filter}" PlaceholderText="Number, start of a number, or a range like 100-150"
+                     ToolTip.Tip="Separate several terms with commas or spaces" />
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Classes="label" Text="Dye" />
+              <NumericUpDown Value="{Binding Dye}" Minimum="0" Maximum="255"
+                             ToolTip.Tip="The dye the previews are drawn in and new figures take" />
+            </StackPanel>
+            <TextBlock Classes="muted" Text="{Binding Summary}" />
+            <TextBlock Classes="muted"
+                       Text="Drag a sprite onto the map to place it, or onto a figure of the same kind to change its sprite. Hold Shift to place a new one on top instead, as stacked items need. Double-click changes the selected figure, or places one beside the player." />
+          </StackPanel>
+          <ListBox x:Name="SpriteRows" ItemsSource="{Binding Rows}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SpriteRowViewModel">
+                <ItemsControl ItemsSource="{Binding Tiles}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" Spacing="2" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SpriteTileViewModel">
+                      <Border Classes="tile" Classes.picked="{Binding IsPicked}" Width="72" Height="84"
+                              PointerPressed="OnSpritePointerPressed" DoubleTapped="OnSpriteDoubleTapped">
+                        <Grid RowDefinitions="*,Auto">
+                          <Image Source="{Binding Preview}" Stretch="Uniform" StretchDirection="DownOnly"
+                                 RenderOptions.BitmapInterpolationMode="None" />
+                          <TextBlock Grid.Row="1" Text="{Binding Label}" HorizontalAlignment="Center" FontSize="11" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+
+      <TabItem Header="Maps">
+        <ScrollViewer>
+          <StackPanel Margin="6" Spacing="6">
+            <TextBlock Classes="heading" Text="Known maps" />
+            <TextBlock Classes="muted" Text="Maps remembered with a name and size. A .map file carries neither, so they are kept here." />
+            <ListBox ItemsSource="{Binding MapEntries}" MaxHeight="300">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:MapEntryViewModel">
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding DisplayName}" />
+                      <TextBlock Text="{Binding Details}" Classes="muted" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Use" VerticalAlignment="Center"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).UseMapCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Grid.Column="2" Content="Forget" VerticalAlignment="Center"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ForgetMapCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBox Text="{Binding MapEntryName}" PlaceholderText="Name (blank uses the zone label)" />
+            <Button Content="Remember the scene's map and size" Command="{Binding RememberMapCommand}" />
+
+            <TextBlock Classes="heading" Text="Find a map from the reference" />
+            <TextBlock Classes="muted"
+                       Text="Set the camera X and Y to the coordinates the reference shows, then search. Every map file and every width and height its size allows is rendered and ranked by how much of the world view matches." />
+            <Button Content="{Binding IsSearchingMaps, Converter={x:Static vm:Converters.SearchLabel}}"
+                    Command="{Binding FindMapCommand}" />
+            <ListBox ItemsSource="{Binding MapCandidatesFound}" MaxHeight="300">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:MapEntryViewModel">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                    <StackPanel VerticalAlignment="Center" Spacing="1">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding DisplayName}" />
+                      <TextBlock Text="{Binding Details}" Classes="muted" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Use" VerticalAlignment="Center"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).UseMapCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Settings" x:Name="SettingsTab">
+        <ScrollViewer>
+          <StackPanel Margin="6" Spacing="10">
+            <Border Classes="notice" IsVisible="{Binding !IsClientReady}">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Choose your Dark Ages client" FontWeight="SemiBold" />
+                <TextBlock TextWrapping="Wrap"
+                           Text="Screenshot Studio draws scenes with the art in a Dark Ages 7.41 install. Browse to the folder Darkages.exe is in; the maps and metafile folders inside it are filled in for you. Then apply." />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Classes="heading" Text="Game client" Margin="0" />
+            <ItemsControl ItemsSource="{Binding ClientSettings}" />
+
+            <TextBlock Classes="heading" Text="Studio data" Margin="0,4,0,0" />
+            <ItemsControl ItemsSource="{Binding DataSettings}" />
+
+            <Button Content="Apply and save" Command="{Binding ApplySettingsCommand}" Classes="accent"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+            <StackPanel Spacing="2">
+              <TextBlock Classes="muted" Text="Settings are saved to" />
+              <SelectableTextBlock Text="{Binding SettingsFile}" TextWrapping="Wrap" FontSize="11" Opacity="0.65" />
+              <TextBlock Classes="muted" Text="Relative paths are resolved against the folder holding it." />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <!-- Right: inspector -->
+    <TabControl DockPanel.Dock="Right" Width="380" Padding="0" x:Name="InspectorTabs" SelectedIndex="1">
+      <TabItem Header="Selected">
+        <ScrollViewer>
+          <StackPanel>
+          <TextBlock Classes="muted" Margin="8" IsVisible="{Binding !HasSelection}"
+                     Text="Nothing selected. Click a figure on the canvas or pick one from the Objects list. The map and interface are on the Scene &amp; HUD tab." />
+          <StackPanel Margin="8" Spacing="4" DataContext="{Binding Selected}" x:DataType="vm:SceneObjectViewModel"
+                      IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).HasSelection}">
+            <Image Source="{Binding Preview}" Height="110" Stretch="None" HorizontalAlignment="Center"
+                   RenderOptions.BitmapInterpolationMode="None" />
+            <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+              <TextBlock Classes="label" Text="Name" />
+              <TextBox Grid.Column="1" Text="{Binding Name}" />
+              <TextBlock Grid.Row="1" Classes="label" Text="Cell X" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding X}" />
+              <TextBlock Grid.Row="2" Classes="label" Text="Cell Y" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Y}" />
+              <TextBlock Grid.Row="3" Classes="label" Text="Facing" />
+              <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:SceneObjectViewModel.Directions}"
+                        SelectedItem="{Binding Direction}" HorizontalAlignment="Stretch" />
+              <TextBlock Grid.Row="4" Grid.Column="1" Classes="muted" IsVisible="{Binding IsPlayer}"
+                         Text="The player. The camera centers on its cell and follows its step offset." />
+            </Grid>
+
+            <!-- Aisling look -->
+            <StackPanel IsVisible="{Binding IsAisling}" Spacing="4">
+              <TextBlock Classes="heading" Text="Appearance" />
+              <Grid ColumnDefinitions="110,*,*" RowSpacing="4" ColumnSpacing="4"
+                    RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                <TextBlock Classes="label" Text="" />
+                <TextBlock Grid.Column="1" Classes="label" Text="Sprite" />
+                <TextBlock Grid.Column="2" Classes="label" Text="Color" />
+
+                <TextBlock Grid.Row="1" Classes="label" Text="Body / pants"
+                           ToolTip.Tip="Body form: 1 male, 2 female, 3/4 ghost, 5/6 invisible, 8/9 saddle. Pants: 0 for none, otherwise the dye of the pants layer, 1 is gray. An overcoat hides the pants." />
+                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Form}" Minimum="0" Maximum="15" />
+                <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding Pants}" Minimum="0" Maximum="15"
+                               ToolTip.Tip="Pants dye, 0 for no pants. 1 is gray." />
+
+                <TextBlock Grid.Row="2" Classes="label" Text="Head / hair" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding Head}" Minimum="0" />
+                <NumericUpDown Grid.Row="2" Grid.Column="2" Value="{Binding HairColor}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="3" Classes="label" Text="Face / skin" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Face}" Minimum="0" Maximum="255" />
+                <NumericUpDown Grid.Row="3" Grid.Column="2" Value="{Binding Skin}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="4" Classes="label" Text="Armor" />
+                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding Armor}" Minimum="0" />
+                <NumericUpDown Grid.Row="4" Grid.Column="2" Value="{Binding ArmorColor}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="5" Classes="label" Text="Arms" />
+                <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Arms}" Minimum="0" />
+
+                <TextBlock Grid.Row="6" Classes="label" Text="Overcoat" />
+                <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding Overcoat}" Minimum="0" />
+                <NumericUpDown Grid.Row="6" Grid.Column="2" Value="{Binding OvercoatColor}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="7" Classes="label" Text="Boots" />
+                <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding Boots}" Minimum="0" />
+                <NumericUpDown Grid.Row="7" Grid.Column="2" Value="{Binding BootsColor}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="8" Classes="label" Text="Weapon" />
+                <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding Weapon}" Minimum="0" />
+
+                <TextBlock Grid.Row="9" Classes="label" Text="Shield" />
+                <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding Shield}" Minimum="0" />
+
+                <TextBlock Grid.Row="10" Classes="label" Text="Accessory 1" />
+                <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding Accessory1}" Minimum="0" />
+                <NumericUpDown Grid.Row="10" Grid.Column="2" Value="{Binding Accessory1Color}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="11" Classes="label" Text="Accessory 2" />
+                <NumericUpDown Grid.Row="11" Grid.Column="1" Value="{Binding Accessory2}" Minimum="0" />
+                <NumericUpDown Grid.Row="11" Grid.Column="2" Value="{Binding Accessory2Color}" Minimum="0" Maximum="255" />
+
+                <TextBlock Grid.Row="12" Classes="label" Text="Accessory 3" />
+                <NumericUpDown Grid.Row="12" Grid.Column="1" Value="{Binding Accessory3}" Minimum="0" />
+                <NumericUpDown Grid.Row="12" Grid.Column="2" Value="{Binding Accessory3Color}" Minimum="0" Maximum="255" />
+
+                <CheckBox Grid.Row="13" Grid.Column="1" Grid.ColumnSpan="2" Content="Translucent" IsChecked="{Binding Translucent}" />
+              </Grid>
+              <TextBlock Classes="muted"
+                         Text="Match tries every fitting item from the item database for a slot, or every slot in turn for the whole look, and keeps what best matches the reference around this figure. Press it again to stop." />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                <ComboBox ItemsSource="{x:Static vm:MainViewModel.LookSlots}" HorizontalAlignment="Stretch"
+                          SelectedItem="{Binding $parent[Window].((vm:MainViewModel)DataContext).LookSlotToMatch}" />
+                <Button Grid.Column="1" Content="Match"
+                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).MatchLookCommand}" />
+              </Grid>
+            </StackPanel>
+
+            <!-- Creature or item -->
+            <StackPanel IsVisible="{Binding IsSprite}" Spacing="4">
+              <TextBlock Classes="heading" Text="Sprite" />
+              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                <TextBlock Classes="label" Text="Sprite" />
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
+                  <NumericUpDown Value="{Binding Sprite}" Minimum="0" />
+                  <Button Grid.Column="1" Content="&lt;"
+                          Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).PreviousSpriteCommand}"
+                          ToolTip.Tip="The previous sprite that has art (Page Up)" />
+                  <Button Grid.Column="2" Content="&gt;"
+                          Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).NextSpriteCommand}"
+                          ToolTip.Tip="The next sprite that has art (Page Down)" />
+                  <Button Grid.Column="3" Content="Browse"
+                          Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).BrowseSpriteCommand}"
+                          ToolTip.Tip="Show this sprite among the others on the Sprites tab" />
+                </Grid>
+                <TextBlock Grid.Row="1" Classes="label" Text="Dye" />
+                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Color}" Minimum="0" Maximum="255" />
+                <TextBlock Grid.Row="2" Classes="label" Text="Type" IsVisible="{Binding IsCreature}" />
+                <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{x:Static vm:SceneObjectViewModel.CreatureTypes}"
+                          SelectedItem="{Binding CreatureType}" IsVisible="{Binding IsCreature}" HorizontalAlignment="Stretch" />
+              </Grid>
+              <Button Content="Match item sprite to reference" IsVisible="{Binding IsItem}"
+                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).MatchItemCommand}"
+                      ToolTip.Tip="Ranks every item sprite by shape on this tile, draws the closest ones and tries the dyes. Press again to stop." />
+            </StackPanel>
+
+            <!-- Pose -->
+            <StackPanel IsVisible="{Binding IsPosable}" Spacing="4">
+              <TextBlock Classes="heading" Text="Pose" />
+              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                <TextBlock Classes="label" Text="Walk frame" ToolTip.Tip="0 stands. A step runs through the other frames of the facing's group." />
+                <NumericUpDown Grid.Column="1" Value="{Binding WalkFrame}" Minimum="0" />
+                <TextBlock Grid.Row="1" Classes="label" Text="Offset X"
+                           ToolTip.Tip="Pixels slid toward the next cell during a step. A full step is 28 by 14. On the player this slides the camera too." />
+                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding OffsetX}" />
+                <TextBlock Grid.Row="2" Classes="label" Text="Offset Y" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding OffsetY}" />
+                <TextBlock Grid.Row="3" Classes="label" Text="Animation" ToolTip.Tip="A body motion or emote id, 0 for none" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Animation}" Minimum="0" Maximum="255" />
+                <TextBlock Grid.Row="4" Classes="label" Text="Animation frame" />
+                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding AnimationFrame}" Minimum="0" Maximum="255" />
+                <TextBlock Grid.Row="5" Classes="label" Text="Idle step"
+                           ToolTip.Tip="The frame inside the idle animation: a creature's segment step, or for an aisling the frame of parts that sway while standing" />
+                <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding IdleStep}" Minimum="0" />
+                <TextBlock Grid.Row="7" Classes="label" Text="Stepping from X"
+                           ToolTip.Tip="During a step, the cell the figure is leaving. It decides what the figure draws in front of and behind. Blank is its own cell." />
+                <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding FromX}" PlaceholderText="own cell" />
+                <TextBlock Grid.Row="8" Classes="label" Text="Stepping from Y" />
+                <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding FromY}" PlaceholderText="own cell" />
+                <TextBlock Grid.Row="9" Classes="label" Text="Effect"
+                           ToolTip.Tip="A spell effect drawn on the figure, such as an aura. Blank for none." />
+                <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding EffectId}" Minimum="0" PlaceholderText="none" />
+                <TextBlock Grid.Row="10" Classes="label" Text="Effect step" ToolTip.Tip="How far the effect's animation has run" />
+                <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding EffectStep}" Minimum="0" />
+                <TextBlock Grid.Row="6" Classes="label" Text="Idle segment" IsVisible="{Binding IsCreature}"
+                           ToolTip.Tip="Which of the sheet's idle animations is playing. Blank draws the plain standing frame." />
+                <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding IdleSegment}" Minimum="0" IsVisible="{Binding IsCreature}"
+                               PlaceholderText="none" />
+              </Grid>
+              <TextBlock Classes="muted" Text="{Binding IdleInfo}" IsVisible="{Binding IsCreature}" />
+              <Button Content="Match pose to reference"
+                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).MatchPoseCommand}"
+                      ToolTip.Tip="Tries every walk frame and idle step (and idle segment for a creature) and keeps the one that matches the reference best" />
+
+              <TextBlock Classes="heading" Text="Speech balloon" />
+              <TextBlock Classes="muted"
+                         Text="Only what is said. The name goes in front automatically: 'Name: ' for Say, 'Name! ' for Shout, nothing for Chant." />
+              <TextBox Text="{Binding BalloonText}" AcceptsReturn="False" PlaceholderText="Blank for none" />
+              <ComboBox ItemsSource="{x:Static vm:SceneObjectViewModel.SpeechModes}" SelectedItem="{Binding BalloonMode}"
+                        HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Scene &amp; HUD">
+        <ScrollViewer>
+          <StackPanel Margin="8" Spacing="4" DataContext="{Binding Hud}" x:DataType="vm:HudViewModel">
+            <TextBlock Classes="heading" Text="Map" />
+            <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+              <TextBlock Classes="label" Text="Map number" />
+              <NumericUpDown Grid.Column="1" Value="{Binding MapId}" Minimum="0" />
+              <TextBlock Grid.Row="1" Classes="label" Text="Width" ToolTip.Tip="0 uses the map catalog" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding MapWidth}" Minimum="0" Maximum="255" />
+              <TextBlock Grid.Row="2" Classes="label" Text="Height" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding MapHeight}" Minimum="0" Maximum="255" />
+              <TextBlock Grid.Row="3" Classes="label" Text="Map flags" ToolTip.Tip="The low nibble is the lighting mode" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding MapFlags}" Minimum="0" Maximum="255" />
+              <TextBlock Grid.Row="4" Classes="label" Text="Time step" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding TimeStep}" Minimum="0" Maximum="255" />
+              <TextBlock Grid.Row="5" Classes="label" Text="Tile animation"
+                         ToolTip.Tip="The moment animated ground tiles and color cycles such as water are caught at" />
+              <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding TileTick}" Minimum="0" />
+              <TextBlock Grid.Row="6" Classes="label" Text="Wall animation"
+                         ToolTip.Tip="The moment animated walls and plants, such as swaying grass, are caught at" />
+              <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding StaticTick}" Minimum="0" />
+              <TextBlock Grid.Row="7" Classes="label" Text="Mouse over X"
+                         ToolTip.Tip="The cell the mouse was over, which the client rings on the ground. Blank for none." />
+              <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding HoverX}" PlaceholderText="none" />
+              <TextBlock Grid.Row="8" Classes="label" Text="Mouse over Y" />
+              <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding HoverY}" PlaceholderText="none" />
+              <TextBlock Grid.Row="9" Classes="label" Text="Mouse over object"
+                         ToolTip.Tip="The figure the mouse was over, which shows its name. -1 is the player, otherwise the object's number. Blank for none." />
+              <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding HoverObject}" Minimum="-1" PlaceholderText="none" />
+            </Grid>
+            <TextBlock Classes="muted" Text="The camera centers on the player. Move the player, or set its pose offset for a step in progress, on the Selected tab." />
+
+            <TextBlock Classes="heading" Text="Doors" />
+            <TextBlock Classes="muted" Text="Ctrl+click a door on the canvas to open or shut it." />
+            <ItemsControl ItemsSource="{Binding $parent[Window].((vm:MainViewModel)DataContext).DoorEntries}" />
+            <Button Content="Put every door back" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ClearDoorsCommand}" />
+
+            <TextBlock Classes="heading" Text="Interface" />
+            <Grid ColumnDefinitions="110,*" RowSpacing="4"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+              <TextBlock Classes="label" Text="Layout" />
+              <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:HudViewModel.Layouts}" SelectedItem="{Binding Layout}"
+                        HorizontalAlignment="Stretch" />
+              <TextBlock Grid.Row="1" Classes="label" Text="Lower panel" />
+              <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:HudViewModel.Panels}" SelectedItem="{Binding Panel}"
+                        HorizontalAlignment="Stretch" />
+              <TextBlock Grid.Row="2" Classes="label" Text="ID" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Name}" />
+              <TextBlock Grid.Row="3" Classes="label" Text="Server" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Server}" />
+              <TextBlock Grid.Row="4" Classes="label" Text="Zone" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Zone}" />
+              <TextBlock Grid.Row="5" Classes="label" Text="Shown X" ToolTip.Tip="Blank shows the player's cell" />
+              <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding PositionX}" />
+              <TextBlock Grid.Row="6" Classes="label" Text="Shown Y" />
+              <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding PositionY}" />
+              <TextBlock Grid.Row="7" Classes="label" Text="Weight" />
+              <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding Weight}" />
+              <TextBlock Grid.Row="8" Classes="label" Text="Max weight" />
+              <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding MaxWeight}" />
+              <TextBlock Grid.Row="9" Classes="label" Text="HP" />
+              <NumericUpDown Grid.Row="9" Grid.Column="1" Value="{Binding Health}" Minimum="0" />
+              <TextBlock Grid.Row="10" Classes="label" Text="Max HP" />
+              <NumericUpDown Grid.Row="10" Grid.Column="1" Value="{Binding MaxHealth}" Minimum="0" />
+              <TextBlock Grid.Row="11" Classes="label" Text="MP" />
+              <NumericUpDown Grid.Row="11" Grid.Column="1" Value="{Binding Mana}" Minimum="0" />
+              <TextBlock Grid.Row="12" Classes="label" Text="Max MP" />
+              <NumericUpDown Grid.Row="12" Grid.Column="1" Value="{Binding MaxMana}" Minimum="0" />
+              <TextBlock Grid.Row="13" Classes="label" Text="Description" />
+              <TextBox Grid.Row="13" Grid.Column="1" Text="{Binding Description}" />
+              <TextBlock Grid.Row="14" Classes="label" Text="Latency (ms)"
+                         ToolTip.Tip="The network light: under 250 blue, under 350 green, under 450 orange, otherwise red" />
+              <NumericUpDown Grid.Row="14" Grid.Column="1" Value="{Binding Latency}" Minimum="0" />
+            </Grid>
+
+            <TextBlock Classes="heading" Text="Status effects" />
+            <TextBlock Classes="muted"
+                       Text="The strip down the right edge, top slot first, at most ten. A blank icon leaves its slot empty. The stage sets the bar: 6 white, 5 red, 4 orange, 3 yellow, 2 green, 1 blue." />
+            <ItemsControl ItemsSource="{Binding StatusEffects}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StatusEffectViewModel">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="4" Margin="0,0,0,2">
+                    <Image Source="{Binding Preview}" Width="31" Height="31" RenderOptions.BitmapInterpolationMode="None" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding Icon}" Minimum="0" PlaceholderText="empty slot"
+                                   ToolTip.Tip="The spell icon number" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding Stage}" Minimum="1" Maximum="6" MinWidth="70"
+                                   ToolTip.Tip="Duration stage: 6 white, 5 red, 4 orange, 3 yellow, 2 green, 1 blue" />
+                    <Button Grid.Column="3" Content="X"
+                            Command="{Binding $parent[ItemsControl].((vm:HudViewModel)DataContext).RemoveStatusEffectCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add effect" Command="{Binding AddStatusEffectCommand}" />
+            <Button Content="Match icons to reference"
+                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).MatchIconsCommand}"
+                    ToolTip.Tip="Finds the effect strip's icons, the books or the inventory the lower panel shows, and the open profile's worn items or legend marks, slot by slot. Press again to stop." />
+
+            <TextBlock Classes="heading" Text="Window" />
+            <TextBlock Classes="muted" Text="The window standing over the world. Each kind shows its own fields below." />
+            <ComboBox ItemsSource="{x:Static vm:HudViewModel.WindowKinds}" SelectedItem="{Binding WindowKind}"
+                      HorizontalAlignment="Stretch" />
+            <ItemsControl ItemsSource="{Binding WindowFields}" />
+
+            <TextBlock Classes="heading" Text="NPC dialog" />
+            <TextBlock Classes="muted"
+                       Text="A conversation over the lower panel. Choices fill the menu; an open shop replaces it. Illustration picks one of the speaker's portraits, by name." />
+            <CheckBox Content="An NPC is talking" IsChecked="{Binding HasNpc}" />
+            <ItemsControl ItemsSource="{Binding NpcFields}" />
+
+            <TextBlock Classes="heading" Text="Character sheet" />
+            <ItemsControl ItemsSource="{Binding SheetFields}" />
+
+            <TextBlock Classes="heading" Text="Items" />
+            <TextBlock Classes="muted"
+                       Text="Icons are one based in the item bank. The inventory page and the profile's paperdoll draw these; Match icons fills the slots they show." />
+            <ItemsControl ItemsSource="{Binding ItemFields}" />
+
+            <TextBlock Classes="heading" Text="Spell book" />
+            <TextBlock Classes="muted" Text="Slot numbers from 1. A page holds 36 slots, so slot 37 starts page two." />
+            <ItemsControl ItemsSource="{Binding Spells}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:BookSlotViewModel">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="4" RowSpacing="2" Margin="0,0,0,4">
+                    <Image Grid.RowSpan="2" Source="{Binding Preview}" Width="31" Height="31" RenderOptions.BitmapInterpolationMode="None" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding Slot}" Minimum="1" MinWidth="70" ToolTip.Tip="Slot" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding Icon}" Minimum="0" ToolTip.Tip="Icon" />
+                    <Button Grid.Column="3" Content="X"
+                            Command="{Binding $parent[ItemsControl].((vm:HudViewModel)DataContext).RemoveBookSlotCommand}"
+                            CommandParameter="{Binding}" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:BookSlotViewModel.CooldownKinds}"
+                              SelectedItem="{Binding Cooldown}" ToolTip.Tip="Cooldown: Locked tints the whole cell, Wipe splits it at the progress line" />
+                    <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding CooldownProgress}" Minimum="0" Maximum="30"
+                                   ToolTip.Tip="How far a skill's cooldown wipe has come down the cell, 0 to 30" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add spell" Command="{Binding AddSpellCommand}" />
+
+            <TextBlock Classes="heading" Text="Skill book" />
+            <ItemsControl ItemsSource="{Binding Skills}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:BookSlotViewModel">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="4" RowSpacing="2" Margin="0,0,0,4">
+                    <Image Grid.RowSpan="2" Source="{Binding Preview}" Width="31" Height="31" RenderOptions.BitmapInterpolationMode="None" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding Slot}" Minimum="1" MinWidth="70" ToolTip.Tip="Slot" />
+                    <NumericUpDown Grid.Column="2" Value="{Binding Icon}" Minimum="0" ToolTip.Tip="Icon" />
+                    <Button Grid.Column="3" Content="X"
+                            Command="{Binding $parent[ItemsControl].((vm:HudViewModel)DataContext).RemoveBookSlotCommand}"
+                            CommandParameter="{Binding}" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:BookSlotViewModel.CooldownKinds}"
+                              SelectedItem="{Binding Cooldown}" ToolTip.Tip="Cooldown: Locked tints the whole cell, Wipe splits it at the progress line" />
+                    <NumericUpDown Grid.Row="1" Grid.Column="2" Value="{Binding CooldownProgress}" Minimum="0" Maximum="30"
+                                   ToolTip.Tip="How far a skill's cooldown wipe has come down the cell, 0 to 30" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add skill" Command="{Binding AddSkillCommand}" />
+
+            <TextBlock Classes="heading" Text="Notices" />
+            <TextBlock Classes="muted" Text="The lines in the top left corner of the world, oldest first, at most three. Blank color is white." />
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Classes="label" Text="Fade step" />
+              <NumericUpDown Value="{Binding NoticeFade}" Minimum="0" Maximum="33"
+                             ToolTip.Tip="0 while the notices are held, then one step per 50 ms of fading through 32" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Notices}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChatLineViewModel">
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,2">
+                    <TextBox Text="{Binding Text}" FontFamily="Consolas,monospace" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding Color}" Minimum="0" Maximum="255" MinWidth="80"
+                                   Margin="4,0" ShowButtonSpinner="False" PlaceholderText="white" />
+                    <Border Grid.Column="2" Width="16" Height="16" Background="{Binding Swatch}" BorderBrush="Gray"
+                            BorderThickness="1" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Content="X" Margin="4,0,0,0"
+                            Command="{Binding $parent[ItemsControl].((vm:HudViewModel)DataContext).RemoveNoticeCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add notice" Command="{Binding AddNoticeCommand}" />
+
+            <TextBlock Classes="heading" Text="Message strip" />
+            <TextBox Text="{Binding HistoryText}" AcceptsReturn="True" Height="70" FontFamily="Consolas,monospace" />
+            <TextBlock Classes="heading" Text="Chat" />
+            <TextBlock Classes="muted" Text="Oldest first. The color is a palette index for the whole line, blank for the default. Inside the text, {=a through {=x change the color of what follows." />
+            <ItemsControl ItemsSource="{Binding ChatLines}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChatLineViewModel">
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,2">
+                    <TextBox Text="{Binding Text}" FontFamily="Consolas,monospace" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding Color}" Minimum="0" Maximum="255" MinWidth="80"
+                                   Margin="4,0" ShowButtonSpinner="False" PlaceholderText="default" />
+                    <Border Grid.Column="2" Width="16" Height="16" Background="{Binding Swatch}" BorderBrush="Gray"
+                            BorderThickness="1" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Content="X" Margin="4,0,0,0"
+                            Command="{Binding $parent[ItemsControl].((vm:HudViewModel)DataContext).RemoveChatLineCommand}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add line" Command="{Binding AddChatLineCommand}" />
+
+            <TextBlock Classes="heading" Text="Text colors" />
+            <ItemsControl ItemsSource="{Binding $parent[Window].((vm:MainViewModel)DataContext).TextColors}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TextColorSwatch">
+                  <StackPanel Orientation="Horizontal" Margin="0,0,10,4" ToolTip.Tip="{Binding Tip}">
+                    <Border Width="14" Height="14" Background="{Binding Brush}" BorderBrush="Gray" BorderThickness="1" />
+                    <TextBlock Text="{Binding Label}" Margin="4,0,0,0" FontSize="11" FontFamily="Consolas,monospace" />
+                    <TextBlock Text="{Binding Index}" Margin="4,0,0,0" FontSize="11" Opacity="0.6" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <!-- Center: canvas -->
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#202020">
+      <controls:SceneCanvas Editor="{Binding}" Zoom="{Binding Zoom}" Margin="12"
+                            HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </ScrollViewer>
+  </DockPanel>
+</Window>

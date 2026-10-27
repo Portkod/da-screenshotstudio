@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DaScreenshotStudio.Assets/DaScreenshotStudio.Assets.csproj" />
+    <Project Path="src/DaScreenshotStudio.Engine/DaScreenshotStudio.Engine.csproj" />
+    <Project Path="src/DaScreenshotStudio.App/DaScreenshotStudio.App.csproj" />
+  </Folder>
+</Solution>

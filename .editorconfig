@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+trim_trailing_whitespace = true
+
+[*.{cs,csproj,props,targets,slnx}]
+indent_size = 4
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.cs]
+# Format names keep whatever the reference calls them.
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1720.severity = none
+
+# Enums mirroring file values are byte or ushort on purpose.
+dotnet_diagnostic.CA1028.severity = none
+
+# Span returning parsers and pooled buffers trip these by design.
+dotnet_diagnostic.CA1819.severity = none
+
+# The renderer's hot structs use public fields on purpose.
+dotnet_diagnostic.CA1051.severity = none
+
+# Newer SDK analyzer the ported reference code predates.
+dotnet_diagnostic.CA1517.severity = none

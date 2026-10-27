@@ -1,0 +1,84 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DaScreenshotStudio.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="TextBlock.heading">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,8,0,4" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Opacity" Value="0.65" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="MinWidth" Value="90" />
+      <Setter Property="FormatString" Value="0" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="10,0" />
+    </Style>
+    <Style Selector="Border.tile">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="2" />
+    </Style>
+    <Style Selector="Border.tile:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+    </Style>
+    <Style Selector="Border.tile.picked">
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <Style Selector="ListBox#SpriteRows ListBoxItem">
+      <Setter Property="Padding" Value="0,1" />
+    </Style>
+    <Style Selector="ListBox#SpriteRows ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox#SpriteRows ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.notice">
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="10,8" />
+    </Style>
+    <Style Selector="TextBlock.feedback">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="TextBlock.feedback.good">
+      <Setter Property="Foreground" Value="#6CCB5F" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.feedback.warning">
+      <Setter Property="Foreground" Value="#FCE100" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="TextBlock.feedback.error">
+      <Setter Property="Foreground" Value="#FF99A4" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Border.pane">
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8" />
+    </Style>
+  </Application.Styles>
+</Application>
